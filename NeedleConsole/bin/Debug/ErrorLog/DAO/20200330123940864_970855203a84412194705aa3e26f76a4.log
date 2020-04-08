@@ -1,0 +1,30 @@
+CREATE TABLE [dbo].[atesttable]
+(
+	[Id] [INT] identity(1,1) not null,
+	[Name] [CHAR](10) default('') not null,
+	[Title] [BIGINT] default(0) not null,
+	[Code] [NVARCHAR](20) default('') not null,
+	[Desc] [NVARCHAR](100) default('') not null,
+	[Money] [DECIMAL](18,2) default(0) not null,
+	[Price] [DECIMAL](18,0) default(0) not null,
+	[Remark] [NVARCHAR](max) default('') not null,
+	[CreateTime] [DATETIME] default('') not null
+)
+ALTER TABLE [dbo].[atesttable] ADD CONSTRAINT [PK_ID_NAME] PRIMARY KEY CLUSTERED (Id ASC)
+CREATE UNIQUE INDEX PK_unique ON [dbo].[atesttable] (Code DESC)
+CREATE NONCLUSTERED INDEX PK_index1 ON [dbo].[atesttable] (Code DESC,Title DESC)
+ALTER TABLE [dbo].[atesttable] ADD CONSTRAINT FK_foreign FOREIGN KEY (Code)
+REFERENCES [dbo].[abacustpartsel] (partno) 
+ON DELETE CASCADE 
+ON UPDATE CASCADE
+System.Data.SqlClient.SqlException (0x80131904): 在被引用表 'dbo.abacustpartsel' 中没有与外键 'FK_foreign' 中的引用列列表匹配的主键或候选键。
+无法创建约束。请参阅前面的错误消息。
+   在 System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   在 System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   在 System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   在 System.Data.SqlClient.SqlCommand.RunExecuteNonQueryTds(String methodName, Boolean async, Int32 timeout, Boolean asyncWrite)
+   在 System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, String methodName, Boolean sendToPipe, Int32 timeout, Boolean& usedCache, Boolean asyncWrite, Boolean inRetry)
+   在 System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   在 Action.Comm.DataAccess.ExecuteNonQuery(String sql, SqlParameter[] param, Boolean errorLog)
+ClientConnectionId:21c53e3e-5d18-4554-8f06-756079da00c1
+Error Number:1776,State:0,Class:16

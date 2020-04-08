@@ -1,0 +1,9 @@
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\obj\Debug\NeedleConsole.csprojAssemblyReference.cache
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\obj\Debug\NeedleConsole.csproj.CoreCompileInputs.cache
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\bin\Debug\NeedleConsole.exe
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\bin\Debug\NeedleConsole.pdb
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\bin\Debug\Action.Comm.dll
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\bin\Debug\Newtonsoft.Json.dll
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\obj\Debug\NeedleConsole.csproj.CopyComplete
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\obj\Debug\NeedleConsole.exe
+D:\VS2013WorkSpace\NeedleConsole\NeedleConsole\obj\Debug\NeedleConsole.pdb

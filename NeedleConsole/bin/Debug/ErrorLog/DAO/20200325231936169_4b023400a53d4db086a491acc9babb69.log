@@ -1,0 +1,29 @@
+CREATE TABLE [dbo].[testtable1]
+(
+	[Id] [INT] identity(1,1) not null,
+	[Name] [CHAR](10) default('') not null,
+	[Title] [BIGINT] default(0) not null,
+	[Code] [NVARCHAR](100) default('') not null,
+	[Desc] [NVARCHAR](100) default('') not null,
+	[Money] [DECIMAL](18,2) default(0) not null,
+	[Price] [DECIMAL](18,0) default(0) not null,
+	[Remark] [NVARCHAR](max) default('') not null,
+	[CreateTime] [DATETIME] default('') not null
+)
+ALTER TABLE [dbo].[testtable1] ADD CONSTRAINT [PK_ID_NAME] PRIMARY KEY CLUSTERED (Id ASC)
+CREATE UNIQUE INDEX PK_unique ON [dbo].[testtable1] (Code DESC)
+CREATE NONCLUSTERED INDEX PK_index1 ON [dbo].[testtable1] (Code DESC,Title DESC)
+ALTER TABLE [dbo].[testtable1] ADD CONSTRAINT PK_foreign FOREIGN KEY (Name DESC)
+REFERENCES [dbo].[testtable] (Name DESC) 
+ON DELETE CASCADE 
+ON UPDATE CASCADE
+System.Data.SqlClient.SqlException (0x80131904): 关键字 'DESC' 附近有语法错误。
+   在 System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   在 System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   在 System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   在 System.Data.SqlClient.SqlCommand.RunExecuteNonQueryTds(String methodName, Boolean async, Int32 timeout, Boolean asyncWrite)
+   在 System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, String methodName, Boolean sendToPipe, Int32 timeout, Boolean& usedCache, Boolean asyncWrite, Boolean inRetry)
+   在 System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   在 Action.Comm.DataAccess.ExecuteNonQuery(String sql, SqlParameter[] param, Boolean errorLog)
+ClientConnectionId:e8b94235-0519-470f-ac73-500e38935b26
+Error Number:156,State:1,Class:15

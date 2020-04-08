@@ -1,0 +1,53 @@
+CREATE TABLE [dbo].[aaatesttable]
+(
+	[Id] [INT] identity(1,1) not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Id',
+	[Name] [CHAR](10) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Name',
+	[Title] [BIGINT] default(0) not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Title',
+	[Code] [NVARCHAR](20) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Code',
+	[Desc] [NVARCHAR](100) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Desc',
+	[fkey1] [VARCHAR](39) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'fkey1',
+	[fkey2] [VARCHAR](20) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'fkey2',
+	[Money] [DECIMAL](18,2) default(0) not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Money',
+	[Price] [DECIMAL](18,0) default(0) not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Price',
+	[Remark] [NVARCHAR](max) default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'Remark',
+	[CreateTime] [DATETIME] default('') not null
+ EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'aaatesttable', @level2type=N'COLUMN',@level2name=N'CreateTime'
+)
+ALTER TABLE [dbo].[aaatesttable] ADD CONSTRAINT [PK_ID_NAME] PRIMARY KEY CLUSTERED ([Id] ASC)
+CREATE UNIQUE INDEX PK_unique ON [dbo].[aaatesttable] ([Desc] DESC)
+CREATE NONCLUSTERED INDEX PK_index1 ON [dbo].[aaatesttable] ([Code] DESC,[Title] DESC)
+ALTER TABLE [dbo].[aaatesttable] ADD CONSTRAINT FK_foreign FOREIGN KEY ([fkey1],[fkey2])
+REFERENCES [dbo].[abacustpartsel] ([partno],[custno]) 
+ON DELETE CASCADE 
+ON UPDATE CASCADE
+System.Data.SqlClient.SqlException (0x80131904): 关键字 'EXEC' 附近有语法错误。
+“CHAR”附近有语法错误。
+“BIGINT”附近有语法错误。
+“NVARCHAR”附近有语法错误。
+“NVARCHAR”附近有语法错误。
+“VARCHAR”附近有语法错误。
+“VARCHAR”附近有语法错误。
+“DECIMAL”附近有语法错误。
+“DECIMAL”附近有语法错误。
+“NVARCHAR”附近有语法错误。
+“DATETIME”附近有语法错误。
+“)”附近有语法错误。
+   在 System.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   在 System.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   在 System.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   在 System.Data.SqlClient.SqlCommand.RunExecuteNonQueryTds(String methodName, Boolean async, Int32 timeout, Boolean asyncWrite)
+   在 System.Data.SqlClient.SqlCommand.InternalExecuteNonQuery(TaskCompletionSource`1 completion, String methodName, Boolean sendToPipe, Int32 timeout, Boolean& usedCache, Boolean asyncWrite, Boolean inRetry)
+   在 System.Data.SqlClient.SqlCommand.ExecuteNonQuery()
+   在 Action.Comm.DataAccess.ExecuteNonQuery(String sql, SqlParameter[] param, Boolean errorLog)
+ClientConnectionId:a9f11e38-12b2-4ca9-b17c-783053028c0f
+Error Number:156,State:1,Class:15
