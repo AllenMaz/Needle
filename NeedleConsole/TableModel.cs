@@ -44,32 +44,15 @@ namespace NeedleConsole
             var sql = @"";
             //升级表步骤
             //查询表是否存在
-            sql = @"select * from sysObjects where Id=OBJECT_ID(N'" + this.TableName + "') and xtype='U'";
+            sql = @"SELECT * FROM sys.objects t WHERE t.type ='u' AND t.object_id = OBJECT_ID("+Parser.QuoteSqlStr("["+this.SchemaName+"].["+this.TableName+"]")+")";
             Console.WriteLine(sql);
             var existTable = da.GetOneRow(sql);
             if (existTable != null)
             {
                 //升级表
-                //查询表的所有列信息
-                sql = @"
-                select t1.name typename --类型名称
-                ,t.name  --列名
-                ,t.max_length --列的最大长度(-1 = 列数据类型为varchar （max）、 nvarchar （max）、 varbinary （max） 或xml。)
-                ,t.precision --精度
-                ,t.scale --小数位数
-                ,t.is_nullable -- 1 =列可为空
-                ,t.is_rowguidcol --1 = 列为声明的 ROWGUIDCOL。
-                ,t.is_identity -- 1 = 列具有标识值
-                ,t.is_computed -- 1 = 列为计算列
-                ,ISNULL(OBJECT_DEFINITION(t.default_object_id),'') defaultvalue --默认值
-                ,ISNULL(t2.name,'') defaultconstraints --默认约束
-                from sys.columns t
-                join sys.types t1 on t.user_type_id = t1.user_type_id
-                LEFT JOIN sys.default_constraints t2 ON t.default_object_id = t2.object_id
-                where t.object_id = OBJECT_ID('{0}')
-                ";
-                sql = string.Format(sql,this.TableName);
-                var existTableColums = ObjectConvert.Convert<TableColumnProperty>(da.GetDataTable(sql)).ToList();
+                var tableForeignKeys = this.GetTableForeignKeys(da);
+                var tableIndexs = this.GetTableIndexs(da);
+                var existTableColums = this.GetTableColumns(da);
                 if (existTableColums.Count > 0)
                 {
                     var existTableColumnNames = existTableColums.Select(v => new { name = v.name});
@@ -148,8 +131,31 @@ namespace NeedleConsole
                     {
                         sql = "";
                         var compareExistColumn = existTableColums.FirstOrDefault(v => v.name == column.name);
+                        //删除列相关的约束
                         if (!string.IsNullOrEmpty(compareExistColumn.defaultconstraints))
-                            sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint "+compareExistColumn.defaultconstraints+"\r\n";
+                        {
+                            sql += "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'D' AND t.object_id = OBJECT_ID('" + compareExistColumn.defaultconstraints + "'))";
+                            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + compareExistColumn.defaultconstraints + "\r\n";
+                        }
+                        //删除相关外键
+                        var refForeignKeys = tableForeignKeys.Where(v=>v.parent_column_name == compareExistColumn.name).Select(v=>v.foreignkeyname).Distinct();
+                        foreach (var fk in refForeignKeys)
+                        {
+                            sql += "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'F' AND t.object_id = OBJECT_ID('"+fk+"'))";
+                            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + fk + "\r\n";
+
+                        }
+
+                        //删除列相关的索引
+                        var indexs = tableIndexs.Where(v => v.column_name == compareExistColumn.name).Select(v => v.index_name).Distinct();
+                        foreach (var idx in indexs)
+                        {
+                            sql += "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID("+Parser.QuoteSqlStr("["+this.SchemaName+"].["+this.TableName+"]")+") and t.name = "+Parser.QuoteSqlStr(idx)+")";
+                            sql += "\r\n drop index " + idx + " on [" + this.SchemaName + "].[" + this.TableName + "]\r\n";
+
+                        }
+
+                        //删除列
                         sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] drop column "+compareExistColumn.name;
                         upgradeSqls.Add(sql);
 
@@ -176,6 +182,11 @@ namespace NeedleConsole
                 else
                     throw new Exception("查询表"+this.TableName+"列信息失败");
                 
+                //升级表索引
+
+                //升级表外键
+
+                //升级表属性
                 
             }
             else
@@ -400,7 +411,95 @@ namespace NeedleConsole
             return defaultValue;
         }
 
+        #region 查询表信息方法
+        /// <summary>
+        /// 查询表外键信息
+        /// </summary>
+        /// <param name="da"></param>
+        /// <returns></returns>
+        private List<TableForeignKeyProperty> GetTableForeignKeys(DataAccess da)
+        {
+            //查询表的所有外键信息
+            var sql = @"
+                SELECT 
+                PT.name parent_table_name --引用外键表名
+                ,PC.name parent_column_name --引用外键列名
+                ,RT.name referenced_table_name --被引用外键表名
+                ,RC.name referenced_column_name,--被引用外键列名
+                FK.name  foreignkeyname --外键名 
+                FROM sys.foreign_key_columns t
+                JOIN sys.objects PT ON t.parent_object_id=PT.object_id
+                JOIN sys.objects RT ON t.referenced_object_id=RT.object_id
+                JOIN sys.columns PC ON t.parent_object_id=PC.object_id AND t.parent_column_id=PC.column_id
+                JOIN sys.columns RC ON t.referenced_object_id=RC.object_id AND t.referenced_column_id=RC.column_id
+                JOIN sys.foreign_keys FK ON t.parent_object_id = fk.parent_object_id AND t.constraint_object_id = fk.object_id
+                    WHERE t.parent_object_id = OBJECT_ID({0})
+            ";
+            sql = string.Format(sql, Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]"));
+            var tableForeignKeys = ObjectConvert.Convert<TableForeignKeyProperty>(da.GetDataTable(sql)).ToList();
+            return tableForeignKeys;
+        }
 
+        /// <summary>
+        /// 查询表索引信息
+        /// </summary>
+        /// <param name="da"></param>
+        /// <returns></returns>
+        private List<TableIndexProperty> GetTableIndexs(DataAccess da)
+        {
+            //查询表的所有索引信息
+            var sql = @"
+                    SELECT 
+	                t.index_id--索引id 0 = 堆 1 = 聚集索引 >1 = 非聚集索引
+	                ,t.type --索引的类型：
+	                ,t.type_desc
+	                ,t.is_unique
+	                ,t.name AS index_name  --索引名称
+	                ,COL_NAME(t1.object_id,t1.column_id) AS column_name  --索引列名
+	                ,t1.index_column_id  --索引列id
+	                ,t1.key_ordinal
+	                ,t1.partition_ordinal
+	                ,t1.is_included_column  --0列不是包含列 1 包含列
+	                ,t1.is_descending_key -- 0升序排列，1 降序排列
+	                FROM sys.indexes t  
+	                JOIN sys.index_columns t1
+	                ON t.object_id = t1.object_id AND t.index_id = t1.index_id  
+	                WHERE t.object_id =OBJECT_ID({0})
+                ";
+            sql = string.Format(sql, Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]"));
+            var tableIndexs = ObjectConvert.Convert<TableIndexProperty>(da.GetDataTable(sql)).ToList();
+            return tableIndexs;
+        }
+
+        /// <summary>
+        /// 查询表所有的列信息
+        /// </summary>
+        /// <param name="da"></param>
+        private List<TableColumnProperty> GetTableColumns(DataAccess da)
+        {
+            //查询表的所有列信息
+            var sql = @"
+                select t1.name typename --类型名称
+                ,t.name  --列名
+                ,t.max_length --列的最大长度(-1 = 列数据类型为varchar （max）、 nvarchar （max）、 varbinary （max） 或xml。)
+                ,t.precision --精度
+                ,t.scale --小数位数
+                ,t.is_nullable -- 1 =列可为空
+                ,t.is_rowguidcol --1 = 列为声明的 ROWGUIDCOL。
+                ,t.is_identity -- 1 = 列具有标识值
+                ,t.is_computed -- 1 = 列为计算列
+                ,ISNULL(OBJECT_DEFINITION(t.default_object_id),'') defaultvalue --默认值
+                ,ISNULL(t2.name,'') defaultconstraints --默认约束
+                from sys.columns t
+                join sys.types t1 on t.user_type_id = t1.user_type_id
+                LEFT JOIN sys.default_constraints t2 ON t.default_object_id = t2.object_id
+                where t.object_id = OBJECT_ID({0})
+                ";
+            sql = string.Format(sql, Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]"));
+            var tableColums = ObjectConvert.Convert<TableColumnProperty>(da.GetDataTable(sql)).ToList();
+            return tableColums;
+        }
+        #endregion 
     }
 
     /// <summary>
@@ -699,5 +798,85 @@ namespace NeedleConsole
         /// 默认约束
         /// </summary>
         public string defaultconstraints { get; set; }
+    }
+
+    public class TableForeignKeyProperty
+    {
+        /// <summary>
+        /// 引用外键表名
+        /// </summary>
+        public string parent_table_name { get; set; }
+        /// <summary>
+        /// 引用外键列名
+        /// </summary>
+        public string parent_column_name { get; set; }
+        /// <summary>
+        /// 被引用外键表名
+        /// </summary>
+        public string referenced_table_name { get; set; }
+        /// <summary>
+        /// 被引用外键列名
+        /// </summary>
+        public string referenced_column_name { get; set; }
+        /// <summary>
+        /// 外键名称
+        /// </summary>
+        public string foreignkeyname { get; set; }
+    }
+
+    public class TableIndexProperty
+    {
+        /// <summary>
+        ///  索引的 ID。 index_id仅在对象中是唯一的。
+        ///  0 = 堆 1 = 聚集索引 > 1 = 非聚集索引
+        /// </summary>
+        public int index_id { get; set; }
+        /// <summary>
+        /// 索引的类型：
+        /*
+            0 = 堆
+            1 = 聚集
+            2 = 非聚集
+            3 = XML
+            4 = 空间
+            5 = 聚集列存储索引。 适用于：SQL Server 2014 (12.x) 及更高版本。
+            6 = 非聚集列存储索引。 适用于：SQL Server 2012 (11.x) 及更高版本。
+            7 = 非聚集哈希索引。 适用于：SQL Server 2014 (12.x) 及更高版本。
+        */
+        /// </summary>
+	    public int type{get;set;}
+        /// <summary>
+        /// 索引类型的说明
+        /// </summary>
+	    public string type_desc { get; set; }
+        /// <summary>
+        /// 1 = 索引是唯一的。0 = 索引不是唯一的。 对于聚集列存储索引始终为 0。
+        /// </summary>
+        public bool is_unique { get; set; }
+        /// <summary>
+        /// 索引名称
+        /// </summary>
+        public string index_name { get; set; }
+        /// <summary>
+        /// 索引列名
+        /// </summary>
+        public string column_name { get; set; }
+        /// <summary>
+        /// 索引列id
+        /// </summary>
+        public int index_column_id { get; set; }
+        /// <summary>
+        /*
+        1 = 列是使用 CREATE INDEX INCLUDE 子句添加到索引的非键列，或者列是列存储索引的一部分。
+        0 = 列不是包含列。
+        因为列是聚集键的一部分而隐式添加的列未列在index_columns中。
+        由于是分区列而隐式添加的列作为 0 返回。
+        */
+        /// </summary>
+        public bool is_included_column { get; set; }
+        /// <summary>
+        /// 1 = 索引键列采用降序排序。 0 = 索引键列的排序方向为升序，或者列是列存储或哈希索引的一部分。
+        /// </summary>
+        public bool is_descending_key { get; set; }
     }
 }
