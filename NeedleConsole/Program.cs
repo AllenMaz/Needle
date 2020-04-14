@@ -111,9 +111,9 @@ namespace NeedleConsole
                 IndexType = IndexType.CLUSTERED
             };
             //设置索引
-            table.Indexs = new List<TalbeIndex>
+            table.Indexs = new List<TableIndex>
             {
-                new TalbeIndex()
+                new TableIndex()
                 {
                     Columns = new List<GroupColum>()
                     {
@@ -126,7 +126,7 @@ namespace NeedleConsole
                     IndexName = "PK_unique",
                     IndexType = IndexType.UNIQUE
                 },
-                 new TalbeIndex()
+                 new TableIndex()
                 {
                     Columns = new List<GroupColum>()
                     {
@@ -258,9 +258,9 @@ namespace NeedleConsole
                 IndexType = IndexType.CLUSTERED
             };
             //设置索引
-            table.Indexs = new List<TalbeIndex>
+            table.Indexs = new List<TableIndex>
             {
-                new TalbeIndex()
+                new TableIndex()
                 {
                     Columns = new List<GroupColum>()
                     {
@@ -268,12 +268,31 @@ namespace NeedleConsole
                         {
                             Name = "Desc",
                             Asc = false
+                        },
+                        new GroupColum()
+                        {
+                            Name = "Codeaaa",
+                            Asc = false
                         }
                     },
                     IndexName = "PK_unique",
                     IndexType = IndexType.UNIQUE
                 },
+                 new TableIndex()
+                {
+                    Columns = new List<GroupColum>()
+                    {
+                        new GroupColum()
+                        {
+                            Name = "Code",
+                            Asc = false
+                        }
+                    },
+                    IndexName = "PK_index1",
+                    IndexType = IndexType.NONCLUSTERED
+                }
             };
+
             return table;
         }
 

@@ -1,6 +1,7 @@
 ﻿using Action.Comm;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 
@@ -16,7 +17,7 @@ namespace NeedleConsole
         /// <summary>
         /// 索引
         /// </summary>
-        public List<TalbeIndex> Indexs { get; set; }
+        public List<TableIndex> Indexs { get; set; }
         /// <summary>
         /// 外键
         /// </summary>
@@ -32,7 +33,7 @@ namespace NeedleConsole
         {
             this.PrimaryKey = null;
             this.ForeignKeys = new List<TableForeignKey>();
-            this.Indexs = new List<TalbeIndex>();
+            this.Indexs = new List<TableIndex>();
             this.SchemaName = schemaName;
             this.Columns = new List<TableColumn>();
         }
@@ -50,9 +51,11 @@ namespace NeedleConsole
             if (existTable != null)
             {
                 //升级表
-                var tableForeignKeys = this.GetTableForeignKeys(da);
-                var tableIndexs = this.GetTableIndexs(da);
+                var existTableForeignKeys = this.GetTableForeignKeys(da);
+                var existTableIndexs = this.GetTableIndexs(da);
                 var existTableColums = this.GetTableColumns(da);
+
+                #region 升级列
                 if (existTableColums.Count > 0)
                 {
                     var existTableColumnNames = existTableColums.Select(v => new { name = v.name});
@@ -138,7 +141,7 @@ namespace NeedleConsole
                             sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + compareExistColumn.defaultconstraints + "\r\n";
                         }
                         //删除相关外键
-                        var refForeignKeys = tableForeignKeys.Where(v=>v.parent_column_name == compareExistColumn.name).Select(v=>v.foreignkeyname).Distinct();
+                        var refForeignKeys = existTableForeignKeys.Where(v=>v.parent_column_name == compareExistColumn.name).Select(v=>v.foreignkeyname).Distinct();
                         foreach (var fk in refForeignKeys)
                         {
                             sql += "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'F' AND t.object_id = OBJECT_ID('"+fk+"'))";
@@ -147,7 +150,8 @@ namespace NeedleConsole
                         }
 
                         //删除列相关的索引
-                        var indexs = tableIndexs.Where(v => v.column_name == compareExistColumn.name).Select(v => v.index_name).Distinct();
+                        var indexs = existTableIndexs.Where(v => v.Columns.Select(a=>a.Name).Contains(compareExistColumn.name))
+                            .Select(v => v.IndexName).Distinct();
                         foreach (var idx in indexs)
                         {
                             sql += "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID("+Parser.QuoteSqlStr("["+this.SchemaName+"].["+this.TableName+"]")+") and t.name = "+Parser.QuoteSqlStr(idx)+")";
@@ -174,20 +178,82 @@ namespace NeedleConsole
 
                         upgradeSqls.Add(sql);
                     }
-                    foreach (var usql in upgradeSqls)
-                    {
-                        Console.WriteLine(usql);
-                    }
+                   
                 }
                 else
                     throw new Exception("查询表"+this.TableName+"列信息失败");
-                
-                //升级表索引
+                #endregion
+                #region 升级表索引
+                var existTableIndexNames = existTableIndexs.Select(v => new { name = v.IndexName });
+                var modelIndexNames = this.Indexs.Select(v => new { name = v.IndexName });
+
+                var needUpgradeIndexes = existTableIndexNames.Where(v => modelIndexNames.Contains(v));
+                var needDeleteIndexes = existTableIndexNames.Where(v => !modelIndexNames.Contains(v));
+                var needAddIndexes = modelIndexNames.Where(v => !existTableIndexNames.Contains(v));
+                //待升级索引
+                foreach (var index in needUpgradeIndexes)
+                {
+                    sql = "";
+                    var compareExistIndex = existTableIndexs.FirstOrDefault(v => v.IndexName == index.name);
+                    var compareModelIndex = this.Indexs.FirstOrDefault(v => v.IndexName == index.name);
+                    var needupdate = false;
+                    if (compareExistIndex.IndexType != compareModelIndex.IndexType ||
+                        compareExistIndex.Columns.Count != compareModelIndex.Columns.Count)
+                        needupdate = true;
+                    else
+                    {
+                        //判断新旧索引列是否一致
+                        for (int i=0;i< compareExistIndex.Columns.Count();i++)
+                        {
+                            if(compareExistIndex.Columns[i] != compareModelIndex.Columns[i])
+                            {
+                                needupdate = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (needupdate)
+                    {
+                        //删除旧索引，
+                        sql += "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID(" + Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]") + ") and t.name = " + Parser.QuoteSqlStr(index.name) + ")";
+                        sql += "\r\n drop index " + index.name + " on [" + this.SchemaName + "].[" + this.TableName + "]\r\n";
+                        //添加新索引
+                        sql += "CREATE " + compareModelIndex.IndexType.ToString().ToUpper() + " INDEX " + compareModelIndex.IndexName + " ON [" + this.SchemaName + "].[" + this.TableName + "]";
+                        sql += " (";
+                        for (var i = 0; i < compareModelIndex.Columns.Count; i++)
+                        {
+                            if (i > 0)
+                                sql += ",";
+                            sql += "[" + compareModelIndex.Columns[i].Name + "]";
+                            if (compareModelIndex.Columns[i].Asc)
+                                sql += " ASC";
+                            else
+                                sql += " DESC";
+                        }
+                        sql += ")";
+
+                        upgradeSqls.Add(sql);
+
+                    }
+
+                }
+                //待删除索引
+                foreach (var index in needUpgradeIndexes)
+                {
+                }
+                //待新建索引
+                foreach (var index in needAddIndexes)
+                {
+                }
+                #endregion
 
                 //升级表外键
 
                 //升级表属性
-                
+                foreach (var usql in upgradeSqls)
+                {
+                    Console.WriteLine(usql);
+                }
             }
             else
             {
@@ -445,7 +511,7 @@ namespace NeedleConsole
         /// </summary>
         /// <param name="da"></param>
         /// <returns></returns>
-        private List<TableIndexProperty> GetTableIndexs(DataAccess da)
+        private List<TableIndexProperty> GetTableIndexsV(DataAccess da)
         {
             //查询表的所有索引信息
             var sql = @"
@@ -471,6 +537,66 @@ namespace NeedleConsole
             return tableIndexs;
         }
 
+        private List<TableIndex> GetTableIndexs(DataAccess da)
+        {
+            List<TableIndex> tableIndexs = new List<TableIndex>();
+            //查询表的所有索引信息
+            var sql = @"
+                    --查询索引信息
+					EXEC sp_helpindex @OBJNAME={0}
+                ";
+            sql = string.Format(sql, Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]"));
+            var tableIndexDatas = da.GetDataTable(sql);
+            foreach (DataRow dr in tableIndexDatas.Rows)
+            {
+                var indexName = Helper.Tostring(dr["index_name"]);
+                //索引说明，其中包括索引所在的文件组。(clustered, unique, primary key located on PRIMARY)
+                var indexDescription = Helper.Tostring(dr["index_description"]); 
+                //被降序索引的列将在结果集中列出，该列的名称后面带有一个减号 (-)，当列出被升序索引的列（这是默认情况）时，只带有该列的名称。
+                var indexKeys = Helper.Tostring(dr["index_keys"]);
+
+                TableIndex index = new TableIndex();
+                index.IndexName = indexName;
+                index.Columns = new List<GroupColum>();
+                //解析索引说明
+                var descs = indexDescription.Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                List<string> indexDescs = new List<string>();
+                descs.ForEach(v=>{
+                    if (v.IndexOf("located on") > -1)
+                        v = v.Split(new string[] { "located on" },StringSplitOptions.RemoveEmptyEntries)[0];
+                    v = v.Trim();
+                    indexDescs.Add(v);
+                });
+                if (indexDescs.Contains("primary key"))
+                    continue; //主键不记录到索引内
+                if (indexDescs.Contains(IndexType.UNIQUE.ToString().ToLower()))
+                    index.IndexType = IndexType.UNIQUE;
+                else if (indexDescs.Contains(IndexType.NONCLUSTERED.ToString().ToLower()))
+                    index.IndexType = IndexType.NONCLUSTERED;
+                else if(indexDescs.Contains(IndexType.CLUSTERED.ToString().ToLower()))
+                    index.IndexType = IndexType.CLUSTERED;
+
+                //解析索引列信息
+                var columns = indexKeys.Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                foreach (var col in columns)
+                {
+                    var colname = col;
+                    var isAsc = true; //是否升序
+                    if (colname.IndexOf("(-)") > -1)
+                    {
+                        isAsc = false;
+                        colname = colname.Replace("(-)","");
+                    }
+                    colname = colname.Trim();
+                    index.Columns.Add(new GroupColum() {
+                        Asc = isAsc,
+                        Name = colname
+                    });
+                }
+                tableIndexs.Add(index);
+            }
+            return tableIndexs;
+        }
         /// <summary>
         /// 查询表所有的列信息
         /// </summary>
@@ -505,7 +631,7 @@ namespace NeedleConsole
     /// <summary>
     /// 表索引
     /// </summary>
-    public class TalbeIndex
+    public class TableIndex
     {
         /// <summary>
         /// 索引名称
