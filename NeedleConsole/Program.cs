@@ -143,6 +143,19 @@ namespace NeedleConsole
                     },
                     IndexName = "PK_index1",
                     IndexType = IndexType.NONCLUSTERED
+                },
+                  new TableIndex()
+                {
+                    Columns = new List<GroupColum>()
+                    {
+                        new GroupColum()
+                        {
+                            Name = "CreateTime",
+                            Asc = true
+                        }
+                    },
+                    IndexName = "PK_index2",
+                    IndexType = IndexType.NONCLUSTERED
                 }
             };
 
@@ -156,12 +169,10 @@ namespace NeedleConsole
                         new GroupColum()
                         {
                             Name = "fkey1",
-                            Asc = false
                         },
                          new GroupColum()
                         {
                             Name = "fkey2",
-                            Asc = false
                         }
                     },
                     IndexName = "FK_foreign",
@@ -171,12 +182,10 @@ namespace NeedleConsole
                         new GroupColum()
                         {
                             Name = "partno",
-                            Asc = false
                         },
                          new GroupColum()
                         {
                             Name = "custno",
-                            Asc = false
                         }
                     },
                     DeleteAction = ForeignKeyDelOrUpdateOperateType.Cascade,
@@ -284,7 +293,7 @@ namespace NeedleConsole
                     {
                         new GroupColum()
                         {
-                            Name = "Code",
+                            Name = "Codeaaa",
                             Asc = false
                         }
                     },

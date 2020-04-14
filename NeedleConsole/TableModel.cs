@@ -58,11 +58,11 @@ namespace NeedleConsole
                 #region 升级列
                 if (existTableColums.Count > 0)
                 {
-                    var existTableColumnNames = existTableColums.Select(v => new { name = v.name});
-                    var modelColumnNames = this.Columns.Select(v=> new { name = v.Name});
-                    var needUpgradeColumns = existTableColumnNames.Where(v=>modelColumnNames.Contains(v));
+                    var existTableColumnNames = existTableColums.Select(v => new { name = v.name });
+                    var modelColumnNames = this.Columns.Select(v => new { name = v.Name });
+                    var needUpgradeColumns = existTableColumnNames.Where(v => modelColumnNames.Contains(v));
                     var needDeleteColumns = existTableColumnNames.Where(v => !modelColumnNames.Contains(v));
-                    var needAddColumns = modelColumnNames.Where(v=> !existTableColumnNames.Contains(v));
+                    var needAddColumns = modelColumnNames.Where(v => !existTableColumnNames.Contains(v));
 
                     //升级列
                     foreach (var column in needUpgradeColumns)
@@ -101,7 +101,7 @@ namespace NeedleConsole
                                 case FieldType.Varbinary:
                                     if (compareExistColumn.max_length != compareModelColumn.Size)
                                         needupdate = true;
-                                 
+
                                     break;
                                 default:
                                     break;
@@ -110,7 +110,7 @@ namespace NeedleConsole
                         if (needupdate)
                         {
                             //修改列
-                            sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] alter column "+this.GenerateUpdateColumnSql(compareModelColumn);
+                            sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] alter column " + this.GenerateUpdateColumnSql(compareModelColumn);
                         }
                         //修改默认值
                         if (!compareModelColumn.Identity)
@@ -120,11 +120,11 @@ namespace NeedleConsole
                             {
                                 //先删除约束
                                 if (!string.IsNullOrEmpty(compareExistColumn.defaultconstraints))
-                                    sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + compareExistColumn.defaultconstraints + "\r\n";
+                                    sql += this.GenerateDeleteConstraintSql(compareExistColumn.defaultconstraints);
                                 sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] add default (" + modelDefaultValue + ") for " + compareModelColumn.Name;
                             }
                         }
-                        
+
                         if (!string.IsNullOrEmpty(sql))
                             upgradeSqls.Add(sql);
 
@@ -137,30 +137,28 @@ namespace NeedleConsole
                         //删除列相关的约束
                         if (!string.IsNullOrEmpty(compareExistColumn.defaultconstraints))
                         {
-                            sql += "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'D' AND t.object_id = OBJECT_ID('" + compareExistColumn.defaultconstraints + "'))";
-                            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + compareExistColumn.defaultconstraints + "\r\n";
+                            sql += this.GenerateDeleteConstraintSql(compareExistColumn.defaultconstraints);
                         }
                         //删除相关外键
-                        var refForeignKeys = existTableForeignKeys.Where(v=>v.parent_column_name == compareExistColumn.name).Select(v=>v.foreignkeyname).Distinct();
+                        var refForeignKeys = existTableForeignKeys.Where(v => v.Columns.Select(a => a.Name).Contains(compareExistColumn.name))
+                            .Select(v => v.IndexName).Distinct();
                         foreach (var fk in refForeignKeys)
                         {
-                            sql += "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'F' AND t.object_id = OBJECT_ID('"+fk+"'))";
-                            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + fk + "\r\n";
+                            sql += this.GenerateDeleteForeignKeySql(fk);
 
                         }
 
                         //删除列相关的索引
-                        var indexs = existTableIndexs.Where(v => v.Columns.Select(a=>a.Name).Contains(compareExistColumn.name))
+                        var indexs = existTableIndexs.Where(v => v.Columns.Select(a => a.Name).Contains(compareExistColumn.name))
                             .Select(v => v.IndexName).Distinct();
                         foreach (var idx in indexs)
                         {
-                            sql += "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID("+Parser.QuoteSqlStr("["+this.SchemaName+"].["+this.TableName+"]")+") and t.name = "+Parser.QuoteSqlStr(idx)+")";
-                            sql += "\r\n drop index " + idx + " on [" + this.SchemaName + "].[" + this.TableName + "]\r\n";
+                            sql += this.GenerateDeleteIndexSql(idx);
 
                         }
 
                         //删除列
-                        sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] drop column "+compareExistColumn.name;
+                        sql += "alter table [" + this.SchemaName + "].[" + this.TableName + "] drop column " + compareExistColumn.name;
                         upgradeSqls.Add(sql);
 
                     }
@@ -168,8 +166,8 @@ namespace NeedleConsole
                     foreach (var column in needAddColumns)
                     {
                         sql = "";
-                        var compareModelColumn = this.Columns.FirstOrDefault(v=>v.Name == column.name);
-                        sql = "alter table ["+this.SchemaName+"].["+this.TableName+"] add " + this.GenerateCreateColumnSql(compareModelColumn);
+                        var compareModelColumn = this.Columns.FirstOrDefault(v => v.Name == column.name);
+                        sql = "alter table [" + this.SchemaName + "].[" + this.TableName + "] add " + this.GenerateCreateColumnSql(compareModelColumn);
                         if (!string.IsNullOrEmpty(compareModelColumn.Desc))
                             sql += "\r\nEXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'" + compareModelColumn.Desc +
                                 "' , @level0type=N'SCHEMA',@level0name=N'" + this.SchemaName +
@@ -178,10 +176,10 @@ namespace NeedleConsole
 
                         upgradeSqls.Add(sql);
                     }
-                   
+
                 }
                 else
-                    throw new Exception("查询表"+this.TableName+"列信息失败");
+                    throw new Exception("查询表" + this.TableName + "列信息失败");
                 #endregion
                 #region 升级表索引
                 var existTableIndexNames = existTableIndexs.Select(v => new { name = v.IndexName });
@@ -203,9 +201,10 @@ namespace NeedleConsole
                     else
                     {
                         //判断新旧索引列是否一致
-                        for (int i=0;i< compareExistIndex.Columns.Count();i++)
+                        for (int i = 0; i < compareExistIndex.Columns.Count(); i++)
                         {
-                            if(compareExistIndex.Columns[i] != compareModelIndex.Columns[i])
+                            if (compareExistIndex.Columns[i].Name != compareModelIndex.Columns[i].Name
+                                || compareExistIndex.Columns[i].Asc != compareModelIndex.Columns[i].Asc)
                             {
                                 needupdate = true;
                                 break;
@@ -215,44 +214,97 @@ namespace NeedleConsole
                     if (needupdate)
                     {
                         //删除旧索引，
-                        sql += "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID(" + Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]") + ") and t.name = " + Parser.QuoteSqlStr(index.name) + ")";
-                        sql += "\r\n drop index " + index.name + " on [" + this.SchemaName + "].[" + this.TableName + "]\r\n";
+                        sql = this.GenerateDeleteIndexSql(index.name);
+                        upgradeSqls.Add(sql);
                         //添加新索引
-                        sql += "CREATE " + compareModelIndex.IndexType.ToString().ToUpper() + " INDEX " + compareModelIndex.IndexName + " ON [" + this.SchemaName + "].[" + this.TableName + "]";
-                        sql += " (";
-                        for (var i = 0; i < compareModelIndex.Columns.Count; i++)
-                        {
-                            if (i > 0)
-                                sql += ",";
-                            sql += "[" + compareModelIndex.Columns[i].Name + "]";
-                            if (compareModelIndex.Columns[i].Asc)
-                                sql += " ASC";
-                            else
-                                sql += " DESC";
-                        }
-                        sql += ")";
-
+                        sql = this.GenerateCreateIndexSql(compareModelIndex);
                         upgradeSqls.Add(sql);
 
                     }
 
                 }
                 //待删除索引
-                foreach (var index in needUpgradeIndexes)
+                foreach (var index in needDeleteIndexes)
                 {
+                    //删除旧索引，
+                    sql = this.GenerateDeleteIndexSql(index.name);
+                    upgradeSqls.Add(sql);
+
                 }
                 //待新建索引
                 foreach (var index in needAddIndexes)
                 {
+                    var compareModelIndex = this.Indexs.FirstOrDefault(v => v.IndexName == index.name);
+                    sql = this.GenerateCreateIndexSql(compareModelIndex);
+                    upgradeSqls.Add(sql);
                 }
                 #endregion
 
-                //升级表外键
+                #region 升级表外键
+                var existTableForeignKeyNames = existTableForeignKeys.Select(v => new { name = v.IndexName });
+                var modelForeignKeyNames = this.ForeignKeys.Select(v => new { name = v.IndexName });
 
+                var needUpgradeForeignKeyes = existTableForeignKeyNames.Where(v => modelForeignKeyNames.Contains(v));
+                var needDeleteForeignKeyes = existTableForeignKeyNames.Where(v => !modelForeignKeyNames.Contains(v));
+                var needAddForeignKeyes = modelForeignKeyNames.Where(v => !existTableForeignKeyNames.Contains(v));
+                //待升级外键
+                foreach (var index in needUpgradeForeignKeyes)
+                {
+                    sql = "";
+                    var compareExistForeignKey = existTableForeignKeys.FirstOrDefault(v => v.IndexName == index.name);
+                    var compareModelForeignKey = this.ForeignKeys.FirstOrDefault(v => v.IndexName == index.name);
+                    var needupdate = false;
+                    if (compareExistForeignKey.ReferenceTable != compareModelForeignKey.ReferenceTable ||
+                        compareExistForeignKey.DeleteAction != compareModelForeignKey.DeleteAction ||
+                        compareExistForeignKey.UpdateAction != compareModelForeignKey.UpdateAction ||
+                        compareExistForeignKey.Columns.Count != compareModelForeignKey.Columns.Count)
+                        needupdate = true;
+                    else
+                    {
+                        //判断新旧外键列是否一致
+                        for (int i = 0; i < compareExistForeignKey.Columns.Count(); i++)
+                        {
+                            if (compareExistForeignKey.Columns[i].Name != compareModelForeignKey.Columns[i].Name)
+                            {
+                                needupdate = true;
+                                break;
+                            }
+                            if (compareExistForeignKey.ReferenceColumns[i].Name != compareModelForeignKey.ReferenceColumns[i].Name)
+                            {
+                                needupdate = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (needupdate)
+                    {
+                        //删除旧的外键
+                        sql = this.GenerateDeleteForeignKeySql(index.name);
+                        //新增外键
+                        sql += this.GenerateCreateForeignKeySql(compareModelForeignKey);
+                        upgradeSqls.Add(sql);
+                    }
+                }
+                //待删除外键
+                foreach (var index in needDeleteForeignKeyes)
+                {
+                    sql = this.GenerateDeleteForeignKeySql(index.name);
+                    upgradeSqls.Add(sql);
+                }
+                //待新增外键
+                foreach (var index in needAddForeignKeyes)
+                {
+                    var compareModelForeignKey = this.ForeignKeys.FirstOrDefault(v => v.IndexName == index.name);
+                    sql += this.GenerateCreateForeignKeySql(compareModelForeignKey);
+                    upgradeSqls.Add(sql);
+                }
+                #endregion
                 //升级表属性
+
                 foreach (var usql in upgradeSqls)
                 {
                     Console.WriteLine(usql);
+                    da.ExecuteNonQuery(usql);
                 }
             }
             else
@@ -287,20 +339,8 @@ namespace NeedleConsole
             //创建主键
             if (this.PrimaryKey != null && this.PrimaryKey.Columns.Count > 0)
             {
-                sql += "\r\nALTER TABLE [" + this.SchemaName + "].[" + this.TableName + "] ADD CONSTRAINT [" + this.PrimaryKey.IndexName + "] PRIMARY KEY " +
-                    this.PrimaryKey.IndexType.ToString().ToUpper();
-                sql += " (";
-                for (var i = 0; i < this.PrimaryKey.Columns.Count; i++)
-                {
-                    if (i > 0)
-                        sql += ",";
-                    sql += "[" + this.PrimaryKey.Columns[i].Name + "]";
-                    if (this.PrimaryKey.Columns[i].Asc)
-                        sql += " ASC";
-                    else
-                        sql += " DESC";
-                }
-                sql += ")";
+                sql += "\r\n";
+                sql += this.GenerateCreateFrimaryKeySql(this.PrimaryKey);
 
             }
             //创建索引
@@ -308,19 +348,8 @@ namespace NeedleConsole
             {
                 foreach (var index in this.Indexs)
                 {
-                    sql += "\r\nCREATE " + index.IndexType.ToString().ToUpper() + " INDEX " + index.IndexName + " ON [" + this.SchemaName + "].[" + this.TableName + "]";
-                    sql += " (";
-                    for (var i = 0; i < index.Columns.Count; i++)
-                    {
-                        if (i > 0)
-                            sql += ",";
-                        sql += "[" + index.Columns[i].Name + "]";
-                        if (index.Columns[i].Asc)
-                            sql += " ASC";
-                        else
-                            sql += " DESC";
-                    }
-                    sql += ")";
+                    sql += "\r\n";
+                    sql += this.GenerateCreateIndexSql(index);
                 }
             }
             //创建外键
@@ -328,24 +357,8 @@ namespace NeedleConsole
             {
                 foreach (var fk in this.ForeignKeys)
                 {
-                    sql += "\r\nALTER TABLE [" + this.SchemaName + "].[" + this.TableName + "] ADD CONSTRAINT " + fk.IndexName + " FOREIGN KEY";
-                    sql += " (";
-                    for (var i = 0; i < fk.Columns.Count; i++)
-                    {
-                        if (i > 0)
-                            sql += ",";
-                        sql += "[" + fk.Columns[i].Name + "]";
-                    }
-                    sql += ")";
-                    sql += "\r\nREFERENCES [" + this.SchemaName + "].[" + fk.ReferenceTable + "]";
-                    sql += " (";
-                    for (var i = 0; i < fk.ReferenceColumns.Count; i++)
-                    {
-                        if (i > 0)
-                            sql += ",";
-                        sql += "[" + fk.ReferenceColumns[i].Name + "]";
-                    }
-                    sql += ")";
+                    sql += "\r\n";
+                    sql += this.GenerateCreateForeignKeySql(fk) ;
                 }
             }
             //添加列属性
@@ -456,6 +469,92 @@ namespace NeedleConsole
 
         }
 
+        private string GenerateCreateForeignKeySql(TableForeignKey fk)
+        {
+            var sql = "ALTER TABLE [" + this.SchemaName + "].[" + this.TableName + "] ADD CONSTRAINT " + fk.IndexName + " FOREIGN KEY";
+            sql += " (";
+            for (var i = 0; i < fk.Columns.Count; i++)
+            {
+                if (i > 0)
+                    sql += ",";
+                sql += "[" + fk.Columns[i].Name + "]";
+            }
+            sql += ")";
+            sql += "\r\nREFERENCES [" + this.SchemaName + "].[" + fk.ReferenceTable + "]";
+            sql += " (";
+            for (var i = 0; i < fk.ReferenceColumns.Count; i++)
+            {
+                if (i > 0)
+                    sql += ",";
+                sql += "[" + fk.ReferenceColumns[i].Name + "]";
+            }
+            sql += ")";
+            sql += "\r\nON DELETE " + fk.DeleteAction.ToString();
+            sql += "\r\nON UPDATE " + fk.DeleteAction.ToString();
+
+            return sql;
+        }
+
+        private string GenerateDeleteForeignKeySql(string name)
+        {
+            //删外键
+            var sql = "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'F' AND t.object_id = OBJECT_ID('" + name + "'))";
+            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + name+"\r\n";
+            return sql;
+        }
+
+        private string GenerateCreateIndexSql(TableIndex index)
+        {
+            var sql = "CREATE " + index.IndexType.ToString().ToUpper() + " INDEX " + index.IndexName + " ON [" + this.SchemaName + "].[" + this.TableName + "]";
+            sql += " (";
+            for (var i = 0; i < index.Columns.Count; i++)
+            {
+                if (i > 0)
+                    sql += ",";
+                sql += "[" + index.Columns[i].Name + "]";
+                if (index.Columns[i].Asc)
+                    sql += " ASC";
+                else
+                    sql += " DESC";
+            }
+            sql += ")";
+            return sql;
+        }
+
+        private string GenerateDeleteIndexSql(string name)
+        {
+            var sql = "IF EXISTS(SELECT * from sys.indexes t WHERE t.object_id = OBJECT_ID(" +
+                Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]") + ") and t.name = " + Parser.QuoteSqlStr(name) + ")";
+            sql += "\r\n drop index " + name + " on [" + this.SchemaName + "].[" + this.TableName + "]\r\n";
+            return sql;
+        }
+
+        private string GenerateCreateFrimaryKeySql(TablePrimaryKey key)
+        {
+            var sql = "ALTER TABLE [" + this.SchemaName + "].[" + this.TableName + "] ADD CONSTRAINT [" + key.IndexName + "] PRIMARY KEY " +
+                    this.PrimaryKey.IndexType.ToString().ToUpper();
+            sql += " (";
+            for (var i = 0; i < this.PrimaryKey.Columns.Count; i++)
+            {
+                if (i > 0)
+                    sql += ",";
+                sql += "[" + this.PrimaryKey.Columns[i].Name + "]";
+                if (this.PrimaryKey.Columns[i].Asc)
+                    sql += " ASC";
+                else
+                    sql += " DESC";
+            }
+            sql += ")";
+            return sql;
+        }
+
+        private string GenerateDeleteConstraintSql(string name)
+        {
+            var sql = "IF EXISTS(SELECT * from sys.objects t WHERE t.type = 'D' AND t.object_id = OBJECT_ID('" + name + "'))";
+            sql += "\r\n alter table [" + this.SchemaName + "].[" + this.TableName + "] drop constraint " + name +"\r\n";
+            return sql;
+        }
+
         private string FormatTableColumnDefaultValue(TableColumn field)
         {
             var defaultValue = "''";
@@ -483,26 +582,88 @@ namespace NeedleConsole
         /// </summary>
         /// <param name="da"></param>
         /// <returns></returns>
-        private List<TableForeignKeyProperty> GetTableForeignKeys(DataAccess da)
+        private List<TableForeignKey> GetTableForeignKeys(DataAccess da)
         {
-            //查询表的所有外键信息
-            var sql = @"
+            List<TableForeignKey> tableForeignKeys = new List<TableForeignKey>();
+           //查询表的所有外键信息
+           var sql = @"
                 SELECT 
                 PT.name parent_table_name --引用外键表名
                 ,PC.name parent_column_name --引用外键列名
                 ,RT.name referenced_table_name --被引用外键表名
-                ,RC.name referenced_column_name,--被引用外键列名
-                FK.name  foreignkeyname --外键名 
+                ,RC.name referenced_column_name --被引用外键列名
+                ,FK.name foreignkeyname --外键名 
+                ,FK.delete_referential_action
+				,FK.delete_referential_action_desc
+				,FK.update_referential_action
+				,FK.update_referential_action_desc
                 FROM sys.foreign_key_columns t
                 JOIN sys.objects PT ON t.parent_object_id=PT.object_id
                 JOIN sys.objects RT ON t.referenced_object_id=RT.object_id
                 JOIN sys.columns PC ON t.parent_object_id=PC.object_id AND t.parent_column_id=PC.column_id
                 JOIN sys.columns RC ON t.referenced_object_id=RC.object_id AND t.referenced_column_id=RC.column_id
                 JOIN sys.foreign_keys FK ON t.parent_object_id = fk.parent_object_id AND t.constraint_object_id = fk.object_id
-                    WHERE t.parent_object_id = OBJECT_ID({0})
+                WHERE t.parent_object_id = OBJECT_ID({0})
+                ORDER BY T.constraint_column_id
             ";
             sql = string.Format(sql, Parser.QuoteSqlStr("[" + this.SchemaName + "].[" + this.TableName + "]"));
-            var tableForeignKeys = ObjectConvert.Convert<TableForeignKeyProperty>(da.GetDataTable(sql)).ToList();
+
+            var tableForeignKeyDatas = da.GetDataTable(sql);
+            foreach (DataRow dr in tableForeignKeyDatas.Rows)
+            {
+                var foreignKeyName = Helper.Tostring(dr["foreignkeyname"]);
+               
+                TableForeignKey existForeignKey = null;
+                if (tableForeignKeys.Count > 0)
+                    existForeignKey = tableForeignKeys.First(v => v.IndexName == foreignKeyName);
+                if (existForeignKey == null)
+                {
+                    var referencedTableName = Helper.Tostring(dr["referenced_table_name"]);
+                    //执行删除时为此 FOREIGN KEY 声明的引用操作。0 = 不执行任何操作 1 = 级联 2 = 设置 Null  3 = 设置默认值
+                    var deleteReferentialAction = Helper.ToInt32(dr["delete_referential_action"]);
+                    var delAction = ForeignKeyDelOrUpdateOperateType.NoAction;
+                    if (deleteReferentialAction == 1)
+                        delAction = ForeignKeyDelOrUpdateOperateType.Cascade;
+                    else if (deleteReferentialAction == 2)
+                        delAction = ForeignKeyDelOrUpdateOperateType.SetNull;
+                    else if (deleteReferentialAction == 3)
+                        delAction = ForeignKeyDelOrUpdateOperateType.SetDefault;
+
+                    //执行更新时为此 FOREIGN KEY 声明的引用操作。 0 = 不执行任何操作 1 = 级联 2 = 设置 Null 3 = 设置默认值
+                    var updateReferentialAction = Helper.ToInt32(dr["update_referential_action"]);
+                    var updateAction = ForeignKeyDelOrUpdateOperateType.NoAction;
+                    if (updateReferentialAction == 1)
+                        updateAction = ForeignKeyDelOrUpdateOperateType.Cascade;
+                    else if (updateReferentialAction == 2)
+                        updateAction = ForeignKeyDelOrUpdateOperateType.SetNull;
+                    else if (updateReferentialAction == 3)
+                        updateAction = ForeignKeyDelOrUpdateOperateType.SetDefault;
+
+                    tableForeignKeys.Add(new TableForeignKey()
+                    {
+                        IndexName = foreignKeyName,
+                        ReferenceTable = referencedTableName,
+                        DeleteAction = delAction,
+                        UpdateAction = updateAction,
+                        Columns = new List<GroupColum>(),
+                        ReferenceColumns = new List<GroupColum>()
+                    });
+                }
+                   
+
+                existForeignKey = tableForeignKeys.First(v => v.IndexName == foreignKeyName);
+                //添加外键关联的列信息
+
+                var parentColumnName = Helper.Tostring(dr["parent_column_name"]);
+                var referencedColumnName = Helper.Tostring(dr["referenced_column_name"]);
+                existForeignKey.Columns.Add(new GroupColum() {
+                    Name = parentColumnName
+                });
+                existForeignKey.ReferenceColumns.Add(new GroupColum()
+                {
+                    Name = referencedColumnName
+                });
+            }
             return tableForeignKeys;
         }
 
@@ -926,29 +1087,6 @@ namespace NeedleConsole
         public string defaultconstraints { get; set; }
     }
 
-    public class TableForeignKeyProperty
-    {
-        /// <summary>
-        /// 引用外键表名
-        /// </summary>
-        public string parent_table_name { get; set; }
-        /// <summary>
-        /// 引用外键列名
-        /// </summary>
-        public string parent_column_name { get; set; }
-        /// <summary>
-        /// 被引用外键表名
-        /// </summary>
-        public string referenced_table_name { get; set; }
-        /// <summary>
-        /// 被引用外键列名
-        /// </summary>
-        public string referenced_column_name { get; set; }
-        /// <summary>
-        /// 外键名称
-        /// </summary>
-        public string foreignkeyname { get; set; }
-    }
 
     public class TableIndexProperty
     {
