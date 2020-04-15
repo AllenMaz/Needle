@@ -188,7 +188,7 @@ namespace NeedleConsole
                             Name = "custno",
                         }
                     },
-                    DeleteAction = ForeignKeyDelOrUpdateOperateType.Cascade,
+                    DeleteAction = ForeignKeyDelOrUpdateOperateType.No_Action,
                     UpdateAction = ForeignKeyDelOrUpdateOperateType.Cascade
                 }
             };
@@ -223,7 +223,7 @@ namespace NeedleConsole
                 {
                     Name = "Codeaaa",
                     DBType = FieldType.Nvarchar,
-                    Size = 10,
+                    Size = 20,
                 },
                 new TableColumn()
                 {
@@ -265,6 +265,31 @@ namespace NeedleConsole
                 },
                 IndexName = "PK_ID_NAME",
                 IndexType = IndexType.CLUSTERED
+            };
+            //设置外键
+            table.ForeignKeys = new List<TableForeignKey>()
+            {
+                new TableForeignKey()
+                {
+                    Columns = new List<GroupColum>()
+                    {
+                        new GroupColum()
+                        {
+                            Name = "Codeaaa",
+                        }
+                    },
+                    IndexName = "FK_foreign_111",
+                    ReferenceTable = "accParams",
+                    ReferenceColumns = new List<GroupColum>()
+                    {
+                        new GroupColum()
+                        {
+                            Name = "ParamId",
+                        }
+                    },
+                    DeleteAction = ForeignKeyDelOrUpdateOperateType.No_Action,
+                    UpdateAction = ForeignKeyDelOrUpdateOperateType.Cascade
+                }
             };
             //设置索引
             table.Indexs = new List<TableIndex>
